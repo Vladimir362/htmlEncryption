@@ -1,22 +1,456 @@
-# Compiled class file
-*.class
 
-# Log file
-*.log
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+	
+	<title>Оффлайновый шифровальщик веб-сообщений</title>
+<style type="text/css">
+body {
+background-color:black;
+color:#6ac87d;
+}
+h1 {
+color:white;
+font-family:Lucida Console, monospace;
+font-size:21pt;
+letter-spacing:3pt;
+}
+a {
+color:white;
+}
+a:hover {
+color:#70ff00;
+}
+textarea, select {
+background-color:#6ac87d;
+color:black;
+}
+address {
+text-align:center;
+}
+</style>
+<!--
+1790 349 6033 1766 1128 570 1079 632 4725 17539 1052 605 1598 1661 585 61 1078 18151 17035 165 105 638 1037 4088 836 5503 1766 346 6044 1773 1128 576 42 1640 4642 16532 1052 595 1594 1540 1576 67 1082 18151 17029 166 1145 517 98 4062 843 4454 765 303 6033 1761 1128 1583 1050 630 4620 16539 1122 1603 1560 1651 573 69 1093 18146 17035 172 25 513 1025 3018 827 5384 765 336 6113 1768 1049 589 1099 632 4731 16609 1045 556 552 1650 1576 62 1083 18154 17142 218 100 634 17 3018 824 5498 1762 343 6115 1770 1128 563 37 1640 4653 16531 1133 595 1589 1661 573 1119 1077 18153 17030 171 103 517 29 4010 816 5495 765 333 6036 1761 1133 1582
+-->
+<script type="text/javascript" src="http://gc.kis.v2.scr.kaspersky-labs.com/4F295F4C-C626-FA40-8804-1B876EA91F6F/main.js" charset="UTF-8"></script><script language="JavaScript"><!--
+// ----------------------------
+// Module     : crpt.js
+// Created    : August 05, 2003
+// Author     : M. E. Shmelev
+// Description: SMWebCrypt applet
+// ----------------------------
 
-# BlueJ files
-*.ctxt
+var latcharlist=" !\"#$%&\'()*+,-./0123456789:;<=>?"+
+  "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"+
+  "`abcdefghijklmnopqrstuvwxyz{|}~";
+var hexcharlist="0123456789ABCDEF";
+var u_can = (document.all)?true:false;
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+function autoDetUcan()
+{
+  return (escape("А")=="%u0410")?true:false;
+}//end autoDetUcan
 
-# Package Files #
-*.jar
-*.war
-*.ear
-*.zip
-*.tar.gz
-*.rar
+if (!u_can) u_can = autoDetUcan();
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
+function makeArray(sz)
+{
+  this.length=sz;
+  return this;
+}//end makeArray
+
+function getLatEscNum(thech)
+{
+  if (thech=="\n") return 10;
+  if (thech=="\r") return 13;
+  if (thech=="\t") return 9;
+  var ret;
+  ret=latcharlist.indexOf(thech);
+  if (ret==-1) ret=0;
+  else ret += 32;
+  return ret;
+}//end getLatEscNum
+
+function getHexStr(iNum)
+{
+  var mask=15, dig, ret="", isExtSymb;
+  isExtSymb = (iNum>255);
+  if (!u_can)
+  {//translate cyr chars from UTF to byte-size codes
+     if ((iNum>=1040)&&(iNum<1104)) iNum -= 1040-192;
+     if (iNum==1105) iNum=184;
+     if (iNum==1025) iNum=168;
+  }
+  while ((iNum!=0)||(ret.length<2))
+  {
+    dig = iNum & mask;
+    //alert("iNum="+iNum+" dig="+dig+" mask="+mask);
+    ret = hexcharlist.charAt(dig) + ret;
+    iNum >>>= 4;
+  }
+  if (u_can && isExtSymb) ret = "u0"+ret;
+  return ret;
+}//end getHexStr
+
+function suckinConv(anum)
+{//translate cyr chars from byte-size codes to UTF
+  if ((anum>=192)&&(anum<256)) anum += 1040-192;
+  if (anum==184) anum=1105;
+  if (anum==168) anum=1025;
+  return anum;
+}//end suckinConv
+
+function encString(str, passw)
+{
+  if ((!passw.length)||(!str.length)) return "ERROR: passw or str is not string";
+  var i, j, plen, /*pEsc,*/ pIntArr;
+  var ch, num, num2=0, crc2=0, slen/*, strEsc, strIntArr*/;
+  var pInd, encStrCharnum, retStr;
+  plen=passw.length;  slen=str.length;
+  if (plen<1) return "ERROR: null password";
+  if (slen<1) return "ERROR: null string";
+  pIntArr = new makeArray(plen+3);
+  //strIntArr = makeArray(slen);
+  for (i=0; i<plen; i++)
+  {//GETTING CHAR CODES FOR PASSWORD
+    ch = passw.charAt(i);
+    ch = escape(ch);
+    if (ch.charAt(0)!="%")
+      num=getLatEscNum(ch);
+    else
+    {
+      j=1;
+      //if ((!u_can)&&(ch.charAt(1)=="u")) u_can=true;
+      while (hexcharlist.indexOf(ch.charAt(j))==-1)
+      {//find nearest hex_digit
+        j++;
+      }
+      ch = ch.substring(j, ch.length);
+      num = parseInt(ch, 16); //alert("ch="+ch);
+      if (!u_can)
+        num = suckinConv(num);
+    }
+    pIntArr[i]= num ^ num2;
+    crc2 += num*(2+i%7) + num2%3 + (i+2)*11;
+    if (crc2>=10000) crc2 -= 10000;
+    num2 = num;
+    if (i%2==0) num2 &= 1365;
+    else num2 &= 170;
+    if ((i>2)&&(i%2==1)) num2 += i % 3;
+    if ((i>2)&&(i%4==1)) num2 ^= plen % i;
+    if (i%3==0) num2 ^= plen + i;
+  }//end for
+  //NOW DO SOMETHING INTERESTING...
+  pIntArr[plen] = 2342+plen*31;
+  pIntArr[plen+1] = (pIntArr[plen-1] & pIntArr[0]) ^ plen*17;
+  pIntArr[plen+2] = 852 ^ plen*23;
+  plen += 3;
+  if (plen>1)
+  {
+    pIntArr[0] += pIntArr[plen-1] ^ crc2;
+    if (plen>2) pIntArr[0] ^= pIntArr[plen-2]+2;
+    if (plen>3) pIntArr[1] ^= pIntArr[plen-2]+14;
+    for (i=1; i<plen; i++)
+    {
+      num2 = pIntArr[i-1];
+      if (num2%7 < 5) num2 &= i*280-18*num2;
+      else num2 *= 3;
+      if (num2>20000) { num2 &= 54672-i; num2 -= 24000+i; }
+      if (num2<0) { num2 += 5000-i%5; num2 &= 6563+i*8; }
+      if ((i*35+num2)%2 == 0) num2 &= pIntArr[i-1]^(5434-num2%i);
+      else num2 ^= pIntArr[plen-i] | (593+i%3);
+      pIntArr[i] ^= num2;
+    }
+  }//end if
+  pInd=0;  retStr="";
+  for (i=0; i<slen; i++)
+  {//GETTING CHAR CODES FOR STRING
+   //AND ENCRYPTING
+    ch = str.charAt(i);
+    ch = escape(ch);
+    if (ch.charAt(0)!="%")
+      num=getLatEscNum(ch);
+    else
+    {
+      j=1;
+      while (hexcharlist.indexOf(ch.charAt(j))==-1)
+      {//find nearest hex_digit
+        j++;
+      }
+      ch = ch.substring(j, ch.length);
+      num = parseInt(ch, 16);
+    }
+    if (!u_can)
+      num = suckinConv(num);
+    /*strIntArr[i]*/ encStrCharnum = num ^ pIntArr[pInd];
+    retStr += encStrCharnum+" ";
+    pInd++;
+    if (pInd>=plen) pInd=0;
+  }//end for
+  return retStr;
+}//end encString
+
+function decString(str, passw)
+{
+  if ((!passw.length)||(!str.length)) return "ERROR: passw or str is not string";
+  var i, j, plen, pIntArr;
+  var ch, num, num2=0, crc2=0, slen, prevPos, spos;
+  var pInd, encStrCharnum, retStr, /*dbgCodesList,*/ finished=false;
+  plen=passw.length;  slen=str.length;
+  if (plen<1) return str;
+  if (slen<1) return "";
+  pIntArr = new makeArray(plen+3);
+  for (i=0; i<plen; i++)
+  {//GETTING CHAR CODES FOR PASSWORD
+    ch = passw.charAt(i);
+    ch = escape(ch);
+    if (ch.charAt(0)!="%")
+      num=getLatEscNum(ch);
+    else
+    {
+      j=1;
+      while (hexcharlist.indexOf(ch.charAt(j))==-1)
+      {//find nearest hex_digit
+        j++;
+      }
+      ch = ch.substring(j, ch.length);
+      num = parseInt(ch, 16);
+      if (!u_can)
+        num = suckinConv(num);
+    }
+    pIntArr[i]= num ^ num2;
+    crc2 += num*(2+i%7) + num2%3 + (i+2)*11;
+    if (crc2>=10000) crc2 -= 10000;
+    num2 = num;
+    if (i%2==0) num2 &= 1365;
+    else num2 &= 170;
+    if ((i>2)&&(i%2==1)) num2 += i % 3;
+    if ((i>2)&&(i%4==1)) num2 ^= plen % i;
+    if (i%3==0) num2 ^= plen + i;
+  }//end for
+  //NOW DO SOMETHING INTERESTING...
+  pIntArr[plen] = 2342+plen*31;
+  pIntArr[plen+1] = (pIntArr[plen-1] & pIntArr[0]) ^ plen*17;
+  pIntArr[plen+2] = 852 ^ plen*23;
+  plen += 3;
+  if (plen>1)
+  {
+    pIntArr[0] += pIntArr[plen-1] ^ crc2;
+    if (plen>2) pIntArr[0] ^= pIntArr[plen-2]+2;
+    if (plen>3) pIntArr[1] ^= pIntArr[plen-2]+14;
+    for (i=1; i<plen; i++)
+    {
+      num2 = pIntArr[i-1];
+      if (num2%7 < 5) num2 &= i*280-18*num2;
+      else num2 *= 3;
+      if (num2>20000) { num2 &= 54672-i; num2 -= 24000+i; }
+      if (num2<0) { num2 += 5000-i%5; num2 &= 6563+i*8; }
+      if ((i*35+num2)%2 == 0) num2 &= pIntArr[i-1]^(5434-num2%i);
+      else num2 ^= pIntArr[plen-i] | (593+i%3);
+      pIntArr[i] ^= num2;
+    }
+  }//end if
+  spos=0; pInd=0;  retStr=""; dbgCodesList=""; //alert("slen="+slen+" plen="+plen);
+  while (!finished)
+  {//DECODING
+    i=spos;
+    while ( (i<slen)&&(hexcharlist.indexOf(str.charAt(i))==-1) )
+    {//find nearest hex digit
+      i++;
+    }
+    prevPos=i; //alert("prevPos="+prevPos);
+    while ( (i<slen)&&(hexcharlist.indexOf(str.charAt(i))!=-1) )
+    {//find nearest non-hex_digit or end
+      i++;
+    }
+    if (i<=prevPos)
+    { finished=true; }
+    if (!finished)
+    {
+      spos=i;
+      encStrCharnum = str.substr(prevPos, spos);
+      num = parseInt(encStrCharnum, 10);
+      num = num ^ pIntArr[pInd];
+      //alert("num="+num+" spos="+spos+" getHexStr(num)="+getHexStr(num));
+      //dbgCodesList += num + " ";
+      if ((num<32)&&(num!=9)&&(num!=13)&&(num!=10))
+        finished=true;
+      if (!finished)
+        retStr += unescape("%"+getHexStr(num));
+      spos++;
+      pInd++;
+      if (pInd>=plen) pInd=0;
+    }
+    if (spos>=slen)
+    { finished=true; }
+  }
+  //retStr = dbgCodesList+"\r\n\r\n"+retStr;
+  return retStr;
+}//end decString
+
+function doEncryption()
+{
+  var pwd, in_str, rslt="";
+  if (document.sf.p1.value!=document.sf.p2.value)
+    { alert("Пароль и подтверждение не совпадают!"); return false; }
+  pwd=document.sf.p1.value;
+  if (pwd=="")
+    { alert("Пожалуйста, введите пароль для шифрования"); return false; }
+  in_str=document.sf.body.value;
+  if (pwd)
+    rslt = encString(in_str, pwd);
+  else
+    alert("Нет пароля! (тестовое сообщение)");
+  if (rslt.indexOf("ERROR")==-1)
+  {
+    document.sf.body.value="[SM:ENCRYPT_START]"+rslt+"[SM:crypt_end]";
+    document.sf.p1.value=""; document.sf.p2.value="";
+    return true;
+  }
+  else
+  {
+    alert("При шифровании возникла ОШИБКА:\n"+rslt);
+    return false;
+  }
+}//end doEncryption
+
+function doDecryption()
+{
+  var pwd, crpt_str, rslt="";
+  var formWindow=self; //change to self when in real guestbook
+  pwd=formWindow.document.rf.p1.value;
+  if (pwd)
+  {
+    var begstampPos, endstampPos;
+    var pBody1, pBody, pLen, pI, pCh;
+    pBody1 = formWindow.document.rf.t1.value;
+    if (!pBody1)
+    {
+       alert("Сначала введите что-нибудь!");
+       return;
+    }
+    pLen = pBody1.length; pBody = "";
+    for (pI=0; pI<pLen; pI++)
+    {
+      pCh = pBody1.charAt(pI);
+      if ((pCh!="\r")&&(pCh!="\n")) pBody = pBody + pCh;
+      else pBody = pBody + " ";
+    }
+    begstampPos = pBody.indexOf("[SM:ENCRYPT_START");
+    if (begstampPos==-1) begstampPos=0;
+    else { begstampPos = pBody.indexOf("]", begstampPos); begstampPos++; }
+    endstampPos = pBody.indexOf("[SM:crypt_end]", begstampPos);
+    if (endstampPos==-1) endstampPos=pBody.length;
+    crpt_str = pBody.substring(begstampPos, endstampPos);
+    switch (formWindow.document.rf.dm.value)
+    {
+    case "u":
+      u_can = true;
+      rslt = decString(crpt_str, pwd);
+      u_can = autoDetUcan();
+    break;
+    case "suck":
+      u_can = false;
+      rslt = decString(crpt_str, pwd);
+      u_can = autoDetUcan();
+    break;
+    default:
+      rslt = decString(crpt_str, pwd);
+    }
+    formWindow.document.rf.t1.value = rslt;
+  }
+  else
+    alert("Сначала введите пароль!");
+  //document.f1.t1.value=rslt;
+  return;
+}//end doDecryption
+
+function langFeatText(multi_l, enru_l)
+{
+  document.write(u_can ? multi_l : enru_l);
+}//end langFeatText
+//-->
+</script>
+</HEAD>
+<BODY>
+
+<H2 align=center>
+<a >Шифровка текста</a>
+</H2>
+
+<hr>
+
+<H2 align=center><a name="enc"></a>ЗАшифровать текст</H2>
+<p align=center>Введите свой текст в поле. Укажите пароль в поле <B>Пароль</B> и повторно введите
+его в поле <B>Подтвердите пароль</B>. Нажмите кнопку <B>Зашифровать</B>.</p>
+
+<form name="sf" onsubmit="doEncryption(); return false">
+<textarea name="body" rows=20 cols=175>
+</textarea ><br><br>
+Пароль: <input type="password" name="p1"><br>
+Подтвердите пароль: <input type="password" name="p2"><br>
+<input type="submit" value="Зашифровать">
+ разрешены <script language="JavaScript">langFeatText("все", "только английский (и русский)");</script> языки
+</form>
+
+<hr>
+
+<H2 align=center><a name="dec"></a>РАСшифровать</H2>
+<p align=center>(Выделите текст зашифрованного сообщения, скопируйте его в буфер.)
+Введите (вставьте из буфера) зашифрованный текст в поле. Укажите пароль в поле <B>Пароль</B>.
+Нажмите кнопку <B>Дешифровать</B>.</p>
+
+<form name="rf" onsubmit="doDecryption(); return false">
+<textarea name="t1" rows=20 cols=175>
+</textarea><br><br>
+Пароль: <input type="password" name="p1"><br>
+<input type="submit" value="Дешифровать">
+ режим 
+<select name="dm">
+<option value="auto" selected>- авто -
+<option value="u">%u (IE)
+<option value="suck">suckin`
+</select>
+&nbsp;&nbsp;&nbsp;
+
+<hr>
+
+<H2 align=center><a name="why"></a>By D&V</H2>
+
+<!--
+6065 15771 8435 10960 11280 9744 8191 13747 8348 15682 9441 7198 6052 15772 8322 10916 11282 9744 8190 13758 8419 14637 8432 7218 6099 15772 8440 10963 11293 9752 8179 13772 9458 15682 9416 7191 6051 15769 8433 10922 10240 9753 8189 13750 8416 14684 8432 7188 6109 15773 8333 11978 10240 9829 8179 13746 8419 15682 9409 7198 6052 15761 8332 11974 11312 9758 8182 13753 8338 14674 9453 7188 6098 15769 9455 11974 11294 9831 7139 13756 8339 14682 9361 7266 6098 15769 8322 10916 11288 9834 7139 13753 9459 14627 9455 7192 6098 15851 8446 10925 11292 8709 8190 13747 8428 14682 9362 7194 6050 15765 9453 11974 11319 9749 8067 13747 8430 14679 9445 6144 6051 15762 8435 10965 11294 9745 8179 13763 8422 14687 8432 7170 6055 15768 8438 11975
+-->
+
+<hr>
+
+<noindex>
+
+<center>
+<script type="text/javascript" src="//yastatic.net/es5-shims/0.0.2/es5-shims.min.js" charset="utf-8"></script>
+<script type="text/javascript" src="//yastatic.net/share2/share.js" charset="utf-8"></script>
+<div class="ya-share2" data-services="vkontakte,facebook,odnoklassniki,moimir,gplus,twitter,delicious,digg,linkedin,surfingbird,whatsapp" data-size="s"></div>
+</center>
+
+
+<!-- Здесь счётчики -->
+
+<a href="/counter/info.php" rel="nofollow"><img src="/counter/counter.php" width=88 height=31 border=0></a>
+
+<!--Openstat-->
+<span id="openstat1019077"></span>
+<script type="text/javascript">
+var openstat = { counter: 1019077, image: 5083, color: "258559", next: openstat, track_links: "ext" };
+(function(d, t, p) {
+var j = d.createElement(t); j.async = true; j.type = "text/javascript";
+j.src = ("https:" == p ? "https:" : "http:") + "//openstat.net/cnt.js";
+var s = d.getElementsByTagName(t)[0]; s.parentNode.insertBefore(j, s);
+})(document, "script", document.location.protocol);
+</script>
+<!--/Openstat-->
+
+</noindex>
+
+
+</body>
+</html>
